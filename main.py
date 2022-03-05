@@ -11,20 +11,23 @@ class MovieDataBase():
         self.movie_df = pd.read_csv('movie_df.csv')
 
     def add_movie(self, title):
-        new_row = pd.DataFrame([[title, dt.datetime.now(), 'No', None, None]], columns=list(self.movie_df.columns))
-        self.movie_df = pd.concat([self.movie_df.copy(), new_row])
-        self.movie_df.reset_index(drop=True, inplace=True)
-        print(self.movie_df)
+        if not title:
+            return 'Please enter a title first', 'warning'
+        if title not in list(self.movie_df['Title']):
+            new_row = pd.DataFrame([[title, dt.datetime.now(), 'No', None, None]], columns=list(self.movie_df.columns))
+            self.movie_df = pd.concat([self.movie_df.copy(), new_row])
+            self.movie_df.reset_index(drop=True, inplace=True)
+            return f'Added {title} to list', 'success'
+        else:
+            return 'Ooops, this movie is already in the list', 'warning'
 
     def submit_rating(self, title, h_score, m_score):
-        print(self.movie_df.index)
-        print(self.movie_df[self.movie_df['Title'] == title])
         idx = self.movie_df.index[self.movie_df['Title'] == title].tolist()[0]
-        print(idx)
-        print(self.movie_df.iloc[idx,:])
-        self.movie_df.iloc[idx,2:5] = ['Yes', h_score, m_score]
-        print('df changed')
-        print(self.movie_df.iloc[idx,:])
+        if h_score and m_score:
+            self.movie_df.iloc[idx,2:5] = ['Yes', h_score, m_score]
+            return f'Submitted rating for {title}', 'success'
+        else:
+            return f'Please submit both scores (between 0 and 10)', 'danger'
 
     def remove_movie(self, title):
         idx = self.movie_df.index[self.movie_df['Title'] == title].tolist()[0]
@@ -65,6 +68,20 @@ class MovieDataBase():
                 ),
                 html.Div(id='new_movie_response',
                     children='Enter a value and press submit', style={"textAlign": "center", "padding": "10px"}),
+                html.Div(
+                    dbc.Alert(
+                        "",
+                        id="alert",
+                        is_open=False,
+                        duration=2000,
+                    ),
+                    style={
+                            "width": "500px",
+                            "display": "inline-block",
+                            "vertical-align": "top",
+                            "padding": "10px",
+                        }
+                ),
                 dbc.RadioItems(
                     options=[
                         {"label": "Watched", "value": 1},
@@ -83,6 +100,20 @@ class MovieDataBase():
                             'color': 'black'
                         }
                     ), style={"textAlign": "center", "padding": "10px", "width": "400px",'margin': 'auto'}
+                ),
+                html.Div(
+                    dbc.Alert(
+                        "",
+                        id="alert_2",
+                        is_open=False,
+                        duration=2000,
+                    ),
+                    style={
+                            "width": "500px",
+                            "display": "inline-block",
+                            "vertical-align": "top",
+                            "padding": "10px",
+                        }
                 ),
                 html.Div(id='rating_ui',
                     children = [
@@ -133,31 +164,26 @@ class MovieDataBase():
         #        n_clicks
         #    )
         @app.callback(
-            Output("new_movie_response", "children"),
+            Output("alert", "is_open"),
+            Output("alert", "children"),
+            Output("alert", "color"),
             Input("new_movie_button", "n_clicks"),
             State('new_movie_input', "value")
         )
         def on_button_click(n_clicks, name):
-            if n_clicks:
-                if name:
-                    self.add_movie(name)
-                    print(f'Added {name} to list')
-                    return f'Added {name} to list'
-                else:
-                    return 'Please enter a movie'
-            else:
-                return ''
+            response, code = self.add_movie(name)
+            return True, response, code
 
         @app.callback(
             Output("movie_table_div2", "children"),
-            [Input("options", "value"), Input("new_movie_response", "children"), Input("ph3", "children")]
+            [Input("options", "value"), Input("alert", "children"), Input("ph3", "children")]
         )
         def updateTable(option, t, t2):
             return self.prepare_table(option) #dbc.Table.from_dataframe(self.movie_df.reset_index(), striped=False, bordered=True, hover=True)
         
         @app.callback(
             Output("movie_dropdown", "options"),
-            [Input("new_movie_response", "children"), Input("ph3", "children")]
+            [Input("alert", "children"), Input("ph3", "children")]
         )
         def updateDropdown(children, children2):
             unwatched = list(self.movie_df[self.movie_df.iloc[:,2] == 'No']['Title'])
@@ -188,6 +214,9 @@ class MovieDataBase():
             return []
         
         @app.callback(
+            Output("alert_2", "is_open"),
+            Output("alert_2", "children"),
+            Output("alert_2", "color"),
             Output('ph1', 'children'),
             Output('ph4', "children"),
             Input("submit_button", "n_clicks"),
@@ -196,8 +225,8 @@ class MovieDataBase():
             State('m_score', "value")
         )
         def submit(n_clicks, title, h_score, m_score):
-            self.submit_rating(title, h_score, m_score)
-            return [], []
+            response, code = self.submit_rating(title, h_score, m_score)
+            return True, response, code, [], []
 
         @app.callback(
             Output('ph2', 'children'),
