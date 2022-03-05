@@ -10,6 +10,7 @@ class MovieDataBase():
         super().__init__()
         self.movie_df = pd.read_csv('movie_df.csv')
         self.show_cols = ['Title', 'Watched?', 'Time Watched', 'H', 'M']
+        self.n_clicks_mull, self.n_clicks_vis_mull = 0, 0
 
     def add_movie(self, title):
         if not title:
@@ -55,6 +56,19 @@ class MovieDataBase():
         app.layout = html.Div([
             html.H1(children="XXX", style={"textAlign": "center", "padding": "40px"}, id='title'),
             html.Div(
+                    html.Hr(
+                        style={
+                            "border-top":"1px dashed #fff"
+                        }
+                    ),
+                    style={
+                            "width": "800px",
+                            'margin': 'auto',
+                        }
+                ),
+            
+            html.H2(children="Choose a Movie", style={"textAlign": "center", "padding": "20px"}, id='ca_movies'),
+            html.Div(
                     dbc.InputGroup(
                         [
                             dbc.Select(id='mulligan_select',
@@ -96,22 +110,23 @@ class MovieDataBase():
                             'margin': 'auto',
                         }
                 ),
+            html.H2(children="All Movies", style={"textAlign": "center", "padding": "20px"}, id='all_movies'),
             html.Div([
                 html.Div(
                     dbc.InputGroup(
                         [
                             dbc.Input(id='new_movie_input', type='text', placeholder="Movie Name"),
-                            dbc.Button('Submit', id='new_movie_button', n_clicks=0),
+                            dbc.Button('Add', id='new_movie_button', n_clicks=0),
                         ]),
                     style={
+                            'margin': 'auto',
                             "width": "500px",
-                            "display": "inline-block",
                             "vertical-align": "top",
                             "padding": "10px",
                         }
                 ),
-                html.Div(id='new_movie_response',
-                    children='Enter a value and press submit', style={"textAlign": "center", "padding": "10px"}),
+                #html.Div(id='new_movie_response',
+                #    children='Enter a movie and press Add', style={"textAlign": "center", "padding": "10px"}),
                 html.Div(
                     dbc.Alert(
                         "",
@@ -139,6 +154,7 @@ class MovieDataBase():
                 html.Div(id='movie_table_div2',
                     children=dbc.Table.from_dataframe(self.movie_df.reset_index(), striped=True, bordered=True, hover=True), style={"textAlign": "center", "padding": "10px", "width": "800px",'margin': 'auto'}
                 ),
+                html.H3(children="Rate a Movie", style={"textAlign": "center", "padding": "20px"}, id='ra_movies'),
                 html.Div(id='movie_dropdown_div',
                     children=dcc.Dropdown([], False, id='movie_dropdown', style={
                             'color': 'black'
@@ -159,6 +175,7 @@ class MovieDataBase():
                             "padding": "10px",
                         }
                 ),
+                
                 html.Div(id='rating_ui',
                     children = [
                         html.Div(
@@ -209,13 +226,19 @@ class MovieDataBase():
             Output("mulligan_table_div", "style"),
             Output("mulligan_table", "children"),
             Input("mulligan_button", "n_clicks"),
+            Input("mulligan_vis_button", "n_clicks"),
             State("mulligan_select", "value"),
             State("mulligan_table_div", "style")
         )
-        def on_button_click(n_clicks, number, style):
-            if n_clicks:
+        def on_button_click(n_clicks_mull, n_clicks_vis_mull, number, style):
+            if n_clicks_mull > self.n_clicks_mull:
+                self.n_clicks_mull = n_clicks_mull
                 style.update({'visibility':'visible'})
                 return style, self.prepare_mulligan_table(int(number))
+            elif n_clicks_vis_mull > self.n_clicks_vis_mull:
+                self.n_clicks_vis_mull = n_clicks_vis_mull
+                style.update({'visibility':'hidden'})
+                return style, []
             else:
                 return style, []
 
