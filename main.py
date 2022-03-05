@@ -46,6 +46,9 @@ class MovieDataBase():
         title = f"{watched} Watched - {total} Total"
         return dbc.Table.from_dataframe(df.reset_index()[self.show_cols], striped=False, bordered=True, hover=True), title
 
+    def prepare_mulligan_table(self, number):
+        df = self.movie_df[self.movie_df.iloc[:,2] == 'No'].sample(number)
+        return dbc.Table.from_dataframe(df[self.show_cols], striped=False, bordered=True, hover=True)
     def main(self):
         print("launching dash")
         app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])#, prevent_initial_callbacks=True)
@@ -54,10 +57,10 @@ class MovieDataBase():
             html.Div(
                     dbc.InputGroup(
                         [
-                            dbc.Select(
+                            dbc.Select(id='mulligan_select',
                                 options=[{"label": f"{i}-way Mulligan", "value": i} for i in range(1,6)],
                                 value=4,
-                                style={"font-size":"30px"}
+                                style={"textAlign": "center","font-size":"30px"}
                             ),
                             dbc.Button("GO!", id="mulligan_button", color="success", n_clicks=0, style={"font-size":"30px"}),
                         ]
@@ -75,6 +78,13 @@ class MovieDataBase():
             html.Div(id='ph3', children = []),
             html.Div(id='ph4', children = []),
             html.Div(id='ph5', children = []),
+            html.Div(id='mulligan_table_div',
+                    children=[
+                        html.Div(id='mulligan_table', children = []),
+                        dbc.Button("Hide Results", id="mulligan_vis_button", n_clicks=0),
+                    ],
+                    style={"textAlign": "center", 'visibility': 'hidden', "padding": "10px", "width": "800px",'margin': 'auto'}
+                ),
             html.Div(
                     html.Hr(
                         style={
@@ -194,6 +204,20 @@ class MovieDataBase():
                 return True, response, code
             else:
                 return False, "", ""
+        
+        @app.callback(
+            Output("mulligan_table_div", "style"),
+            Output("mulligan_table", "children"),
+            Input("mulligan_button", "n_clicks"),
+            State("mulligan_select", "value"),
+            State("mulligan_table_div", "style")
+        )
+        def on_button_click(n_clicks, number, style):
+            if n_clicks:
+                style.update({'visibility':'visible'})
+                return style, self.prepare_mulligan_table(int(number))
+            else:
+                return style, []
 
         @app.callback(
             [Output("movie_table_div2", "children"), Output("title", "children")],
