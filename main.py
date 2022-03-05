@@ -9,12 +9,13 @@ class MovieDataBase():
     def __init__(self) -> None:
         super().__init__()
         self.movie_df = pd.read_csv('movie_df.csv')
+        self.show_cols = ['Title', 'Watched?', 'Time Watched', 'H', 'M']
 
     def add_movie(self, title):
         if not title:
             return 'Please enter a title first', 'warning'
         if title not in list(self.movie_df['Title']):
-            new_row = pd.DataFrame([[title, dt.datetime.now(), 'No', None, None]], columns=list(self.movie_df.columns))
+            new_row = pd.DataFrame([[title, dt.datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), 'No', None, None, None]], columns=list(self.movie_df.columns))
             self.movie_df = pd.concat([self.movie_df.copy(), new_row])
             self.movie_df.reset_index(drop=True, inplace=True)
             return f'Added {title} to list', 'success'
@@ -24,7 +25,7 @@ class MovieDataBase():
     def submit_rating(self, title, h_score, m_score):
         idx = self.movie_df.index[self.movie_df['Title'] == title].tolist()[0]
         if h_score and m_score:
-            self.movie_df.iloc[idx,2:5] = ['Yes', h_score, m_score]
+            self.movie_df.iloc[idx,2:6] = ['Yes', dt.datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), h_score, m_score]
             return f'Submitted rating for {title}', 'success'
         else:
             return f'Please submit both scores (between 0 and 10)', 'danger'
@@ -40,18 +41,51 @@ class MovieDataBase():
             df = self.movie_df[self.movie_df.iloc[:,2] == 'No']
         elif option == 3: #All
             df = self.movie_df
-        return dbc.Table.from_dataframe(df.reset_index(), striped=False, bordered=True, hover=True)
+        total = self.movie_df.shape[0]
+        watched = self.movie_df[self.movie_df.iloc[:,2] == 'Yes'].shape[0]
+        title = f"{watched} Watched - {total} Total"
+        return dbc.Table.from_dataframe(df.reset_index()[self.show_cols], striped=False, bordered=True, hover=True), title
 
     def main(self):
         print("launching dash")
-        app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], prevent_initial_callbacks=True)
+        app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])#, prevent_initial_callbacks=True)
         app.layout = html.Div([
-            html.H1(children="Movie Thingo", style={"textAlign": "center", "padding": "40px"}, id='title'),
+            html.H1(children="XXX", style={"textAlign": "center", "padding": "40px"}, id='title'),
+            html.Div(
+                    dbc.InputGroup(
+                        [
+                            dbc.Select(
+                                options=[{"label": f"{i}-way Mulligan", "value": i} for i in range(1,6)],
+                                value=4,
+                                style={"font-size":"30px"}
+                            ),
+                            dbc.Button("GO!", id="mulligan_button", color="success", n_clicks=0, style={"font-size":"30px"}),
+                        ]
+                    ),
+                    style={
+                            "width": "500px",
+                            'margin': 'auto',
+                            "vertical-align": "top",
+                            "padding": "10px",
+                            "font-size": "150px"
+                        }
+                ),
             html.Div(id='ph1', children = []),
             html.Div(id='ph2', children = []),
             html.Div(id='ph3', children = []),
             html.Div(id='ph4', children = []),
             html.Div(id='ph5', children = []),
+            html.Div(
+                    html.Hr(
+                        style={
+                            "border-top":"1px dashed #fff"
+                        }
+                    ),
+                    style={
+                            "width": "800px",
+                            'margin': 'auto',
+                        }
+                ),
             html.Div([
                 html.Div(
                     dbc.InputGroup(
@@ -145,24 +179,8 @@ class MovieDataBase():
                     ],
                     style={"textAlign": "center", 'visibility':'hidden','margin': 'auto'}
                 )
-
-                
-                
-                #dbc.Table.from_dataframe(self.movie_df, striped=True, bordered=True, hover=True), style={"textAlign": "center", "padding": "10px"})
-            
             ], style={"textAlign": "center"}),
         ])
-        
-        #@app.callback(
-        #    Output('container-button-basic', 'children'),
-        #    Input('submit-val', 'n_clicks'),
-        #    State('input-on-submit', 'value')
-        #)
-        #def update_output(n_clicks, value):
-        #    return 'The input value was "{}" and the button has been clicked {} times'.format(
-        #        value,
-        #        n_clicks
-        #    )
         @app.callback(
             Output("alert", "is_open"),
             Output("alert", "children"),
@@ -171,15 +189,18 @@ class MovieDataBase():
             State('new_movie_input', "value")
         )
         def on_button_click(n_clicks, name):
-            response, code = self.add_movie(name)
-            return True, response, code
+            if n_clicks:
+                response, code = self.add_movie(name)
+                return True, response, code
+            else:
+                return False, "", ""
 
         @app.callback(
-            Output("movie_table_div2", "children"),
+            [Output("movie_table_div2", "children"), Output("title", "children")],
             [Input("options", "value"), Input("alert", "children"), Input("ph3", "children")]
         )
         def updateTable(option, t, t2):
-            return self.prepare_table(option) #dbc.Table.from_dataframe(self.movie_df.reset_index(), striped=False, bordered=True, hover=True)
+            return self.prepare_table(option)
         
         @app.callback(
             Output("movie_dropdown", "options"),
@@ -225,8 +246,11 @@ class MovieDataBase():
             State('m_score', "value")
         )
         def submit(n_clicks, title, h_score, m_score):
-            response, code = self.submit_rating(title, h_score, m_score)
-            return True, response, code, [], []
+            if n_clicks:
+                response, code = self.submit_rating(title, h_score, m_score)
+                return True, response, code, [], []
+            else:
+                return False, "", "", [], []
 
         @app.callback(
             Output('ph2', 'children'),
@@ -235,7 +259,8 @@ class MovieDataBase():
             State('movie_dropdown', "value")
         )
         def submit(n_clicks, title):
-            self.remove_movie(title)
+            if n_clicks:
+                self.remove_movie(title)
             return [], []
         
         @app.callback(
