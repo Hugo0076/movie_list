@@ -8,9 +8,14 @@ import datetime as dt
 class MovieDataBase():
     def __init__(self) -> None:
         super().__init__()
-        self.movie_df = pd.read_csv('movie_df.csv')
-        self.show_cols = ['Title', 'Watched?', 'Time Watched', 'H', 'M']
+        self.movie_df = pd.read_parquet('movie_df.parquet')
+        self.show_cols = ['Title', 'Watched?', 'Date Watched', 'H', 'M']
         self.n_clicks_mull, self.n_clicks_vis_mull = 0, 0
+
+    def save(self):
+        print(self.movie_df)
+        self.movie_df.to_parquet('movie_df.parquet')
+        print('saved')
 
     def add_movie(self, title):
         if not title:
@@ -19,6 +24,7 @@ class MovieDataBase():
             new_row = pd.DataFrame([[title, dt.datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), 'No', None, None, None]], columns=list(self.movie_df.columns))
             self.movie_df = pd.concat([self.movie_df.copy(), new_row])
             self.movie_df.reset_index(drop=True, inplace=True)
+            self.save()
             return f'Added {title} to list', 'success'
         else:
             return 'Ooops, this movie is already in the list', 'warning'
@@ -27,6 +33,7 @@ class MovieDataBase():
         idx = self.movie_df.index[self.movie_df['Title'] == title].tolist()[0]
         if h_score and m_score:
             self.movie_df.iloc[idx,2:6] = ['Yes', dt.datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), h_score, m_score]
+            self.save()
             return f'Submitted rating for {title}', 'success'
         else:
             return f'Please submit both scores (between 0 and 10)', 'danger'
@@ -34,6 +41,7 @@ class MovieDataBase():
     def remove_movie(self, title):
         idx = self.movie_df.index[self.movie_df['Title'] == title].tolist()[0]
         self.movie_df = self.movie_df.drop(idx).reset_index(drop=True)
+        self.save()
     
     def prepare_table(self, option):
         if option == 1: #Watched
@@ -44,7 +52,7 @@ class MovieDataBase():
             df = self.movie_df
         total = self.movie_df.shape[0]
         watched = self.movie_df[self.movie_df.iloc[:,2] == 'Yes'].shape[0]
-        title = f"{watched} Watched - {total} Total"
+        title = f"Groovy Movie-nator : {watched} Watched - {total} Total"
         return dbc.Table.from_dataframe(df.reset_index()[self.show_cols], striped=False, bordered=True, hover=True), title
 
     def prepare_mulligan_table(self, number):
@@ -152,7 +160,8 @@ class MovieDataBase():
                     inline=True,
                 ),
                 html.Div(id='movie_table_div2',
-                    children=dbc.Table.from_dataframe(self.movie_df.reset_index(), striped=True, bordered=True, hover=True), style={"textAlign": "center", "padding": "10px", "width": "800px",'margin': 'auto'}
+                    children=dbc.Table.from_dataframe(self.movie_df.reset_index(), striped=True, bordered=True, hover=True),
+                    style={"textAlign": "center", "padding": "10px", "width": "800px",'margin': 'auto','height': '300px','overflow': 'scroll'}
                 ),
                 html.H3(children="Rate a Movie", style={"textAlign": "center", "padding": "20px"}, id='ra_movies'),
                 html.Div(id='movie_dropdown_div',
